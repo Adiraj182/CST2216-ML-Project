@@ -18,12 +18,12 @@ logger = get_logger(__name__)
 def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=100, rf_max_depth=None):
     """
     Executes the Loan Eligibility Model pipeline.
+    Returns metrics AND trained model objects so app.py can run live predictions.
     """
     logger.info("Starting Loan Eligibility Pipeline")
     results = {}
     
     try:
-        # Import the data
         logger.info(f"Loading dataset from {data_path}")
         df = pd.read_csv(data_path)
         results['initial_shape'] = df.shape
@@ -33,74 +33,67 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         df['Loan_Amount_Term'] = df['Loan_Amount_Term'].astype('object')
         
         logger.info("Imputing missing values")
-        # Impute all missing values in all the features
-        # Categorical variables
         df['Gender'] = df['Gender'].fillna('Male')
         df['Married'] = df['Married'].fillna(df['Married'].mode()[0])
         df['Dependents'] = df['Dependents'].fillna(df['Dependents'].mode()[0])
         df['Self_Employed'] = df['Self_Employed'].fillna(df['Self_Employed'].mode()[0])
         df['Loan_Amount_Term'] = df['Loan_Amount_Term'].fillna(df['Loan_Amount_Term'].mode()[0])
         df['Credit_History'] = df['Credit_History'].fillna(df['Credit_History'].mode()[0])
-        
-        # Numerical variable
         df['LoanAmount'] = df['LoanAmount'].fillna(df['LoanAmount'].median())
         
-        # drop 'Loan_ID' variable from the data.
         if 'Loan_ID' in df.columns:
             df = df.drop('Loan_ID', axis=1)
             
-        # Create dummy variables for all 'object' type variables except 'Loan_Status'
-        df = pd.get_dummies(df, columns=['Gender', 'Married', 'Dependents','Education','Self_Employed','Property_Area'], dtype=int)
+        df = pd.get_dummies(df, columns=['Gender', 'Married', 'Dependents', 'Education', 'Self_Employed', 'Property_Area'], dtype=int)
+        df['Loan_Approved'] = df['Loan_Approved'].replace({'Y': 1, 'N': 0}).astype(int)
         
-        # replace values in Loan_approved column
-        df['Loan_Approved'] = df['Loan_Approved'].replace({'Y':1, 'N':0}).astype(int)
-        
-        # Separate the input features and target variable
-        x = df.drop('Loan_Approved',axis=1)
+        x = df.drop('Loan_Approved', axis=1)
         y = df.Loan_Approved
         
+        # Store feature columns so app.py can reconstruct the same shape for user input
+        feature_cols = list(x.columns)
+        results['feature_cols'] = feature_cols
+        
         logger.info("Splitting and scaling data")
-        # splitting the data in training and testing set
         xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2, stratify=y, random_state=42)
         
-        # scale the data using min-max scalar
         scale = MinMaxScaler()
         xtrain_scaled = scale.fit_transform(xtrain)
         xtest_scaled = scale.transform(xtest)
+        results['scaler'] = scale   # <-- returned so app.py can scale user input
         
-        # 1. Logistic Regression Model
+        # 1. Logistic Regression
         logger.info("Training Logistic Regression Model")
         lrmodel = LogisticRegression(C=lr_c, max_iter=200)
         lrmodel.fit(xtrain_scaled, ytrain)
         lr_ypred = lrmodel.predict(xtest_scaled)
-        lr_acc = accuracy_score(ytest, lr_ypred)
-        results['logistic_regression_acc'] = lr_acc
+        results['logistic_regression_acc'] = accuracy_score(ytest, lr_ypred)
         results['lr_report'] = classification_report(ytest, lr_ypred)
+        results['lr_model'] = lrmodel  # <-- returned for live prediction
         
-        # 2. Decision Tree Model
+        # 2. Decision Tree
         logger.info("Training Decision Tree Model")
         dtmodel = DecisionTreeClassifier()
         dtmodel.fit(xtrain_scaled, ytrain)
         dt_ypred = dtmodel.predict(xtest_scaled)
-        dt_acc = accuracy_score(ytest, dt_ypred)
-        results['decision_tree_acc'] = dt_acc
+        results['decision_tree_acc'] = accuracy_score(ytest, dt_ypred)
         results['dt_report'] = classification_report(ytest, dt_ypred)
+        results['dt_model'] = dtmodel  # <-- returned for live prediction
         
-        # 3. Random Forest Model
+        # 3. Random Forest
         logger.info("Training Random Forest Model")
         rfmodel = RandomForestClassifier(n_estimators=rf_n_estimators, max_depth=rf_max_depth, random_state=42)
         rfmodel.fit(xtrain_scaled, ytrain)
         rf_ypred = rfmodel.predict(xtest_scaled)
-        rf_acc = accuracy_score(ytest, rf_ypred)
-        results['random_forest_acc'] = rf_acc
+        results['random_forest_acc'] = accuracy_score(ytest, rf_ypred)
         results['rf_report'] = classification_report(ytest, rf_ypred)
+        results['rf_model'] = rfmodel  # <-- returned for live prediction
         
         # KFold Cross Validation
         logger.info("Performing K-Fold Cross Validation")
         kfold = KFold(n_splits=5)
         lr_scores = cross_val_score(lrmodel, xtrain_scaled, ytrain, cv=kfold)
         rf_scores = cross_val_score(rfmodel, xtrain_scaled, ytrain, cv=kfold)
-        
         results['lr_kfold_mean'] = lr_scores.mean()
         results['rf_kfold_mean'] = rf_scores.mean()
         

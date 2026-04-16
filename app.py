@@ -13,6 +13,9 @@ from loan_eligibility import run_loan_model
 from real_estate import run_real_estate_model
 from ucla_neural_networks import run_admission_model
 from unsupervised_clustering import run_clustering
+from logger import get_logger
+
+logger = get_logger("app")
 
 # Streamlit config
 st.set_page_config(page_title="ML Modeler", layout="wide", page_icon="🚀")
@@ -42,6 +45,7 @@ def get_clustering_results(k_min, k_max):
 st.sidebar.title("Navigation")
 menu = ["Project Overiew", "1. Loan Eligibility Model", "2. Real Estate Pricing", "3. UCLA Admission Networks", "4. Customer Clustering"]
 choice = st.sidebar.selectbox("Select a Page:", menu)
+logger.info(f"User navigated to: {choice}")
 
 st.sidebar.markdown("---")
 
@@ -78,6 +82,7 @@ elif choice == "1. Loan Eligibility Model":
             res = get_loan_results(lr_c, rf_n_estimators, rf_max_depth)
         
         st.success("Pipeline executed successfully!")
+        logger.info("Loan Eligibility page: model results rendered successfully.")
         
         st.subheader("Model Accuracies")
         c1, c2, c3 = st.columns(3)
@@ -102,6 +107,7 @@ elif choice == "1. Loan Eligibility Model":
         st.write(f"**Random Forest**: {res['rf_kfold_mean']:.4f}")
         
     except Exception as e:
+        logger.error(f"Loan Eligibility page error: {str(e)}", exc_info=True)
         st.error(f"Error loading system: {str(e)}")
 
 elif choice == "2. Real Estate Pricing":
@@ -125,6 +131,7 @@ elif choice == "2. Real Estate Pricing":
             res = get_real_estate_results(rf_n_estimators, rf_max_depth)
         
         st.success("Trained successfully!")
+        logger.info("Real Estate page: model results rendered successfully.")
         st.subheader("Mean Absolute Error (MAE)")
         c1, c2, c3 = st.columns(3)
         c1.metric("Linear Reg. (Train)", f"{res['linear_regression_train_mae']:.2f}")
@@ -132,6 +139,7 @@ elif choice == "2. Real Estate Pricing":
         c3.metric("Random Forest (Test)", f"{res['random_forest_test_mae']:.2f}")
         
     except Exception as e:
+        logger.error(f"Real Estate page error: {str(e)}", exc_info=True)
         st.error(f"Error loading system: {str(e)}")
 
 elif choice == "3. UCLA Admission Networks":
@@ -157,6 +165,7 @@ elif choice == "3. UCLA Admission Networks":
             res = get_ucla_results(mlp_hidden_neurons, mlp_max_iter, mlp_learning_rate)
             
         st.success("Loss curves and accuracies updated!")
+        logger.info("UCLA Admission page: model results rendered successfully.")
         
         # Display accuracies
         st.subheader("MLPClassifier Activation: ReLU")
@@ -190,6 +199,7 @@ elif choice == "3. UCLA Admission Networks":
         st.pyplot(fig)
 
     except Exception as e:
+        logger.error(f"UCLA Admission page error: {str(e)}", exc_info=True)
         st.error(f"Error loading system: {str(e)}")
 
 elif choice == "4. Customer Clustering":
@@ -212,6 +222,7 @@ elif choice == "4. Customer Clustering":
              res = get_clustering_results(k_min, k_max)
              
         st.success("Unsupervised clustering completed!")
+        logger.info("Customer Clustering page: results rendered successfully.")
         
         c1, c2 = st.columns(2)
         
@@ -225,4 +236,5 @@ elif choice == "4. Customer Clustering":
         st.markdown("**(Highlighted rows indicate optimal clusters based on highest Silhouette Score)**")
 
     except Exception as e:
+        logger.error(f"Customer Clustering page error: {str(e)}", exc_info=True)
         st.error(f"Error loading system: {str(e)}")

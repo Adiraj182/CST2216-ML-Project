@@ -3,29 +3,28 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import warnings
-import logging
 from sklearn.model_selection import train_test_split, KFold, cross_val_score
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from logger import get_logger
 
 warnings.filterwarnings("ignore")
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = get_logger(__name__)
 
 def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=100, rf_max_depth=None):
     """
     Executes the Loan Eligibility Model pipeline.
     """
-    logging.info("Starting Loan Eligibility Pipeline")
+    logger.info("Starting Loan Eligibility Pipeline")
     results = {}
     
     try:
         # Import the data
-        logging.info(f"Loading dataset from {data_path}")
+        logger.info(f"Loading dataset from {data_path}")
         df = pd.read_csv(data_path)
         results['initial_shape'] = df.shape
         
@@ -33,7 +32,7 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         df['Credit_History'] = df['Credit_History'].astype('object')
         df['Loan_Amount_Term'] = df['Loan_Amount_Term'].astype('object')
         
-        logging.info("Imputing missing values")
+        logger.info("Imputing missing values")
         # Impute all missing values in all the features
         # Categorical variables
         df['Gender'] = df['Gender'].fillna('Male')
@@ -60,7 +59,7 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         x = df.drop('Loan_Approved',axis=1)
         y = df.Loan_Approved
         
-        logging.info("Splitting and scaling data")
+        logger.info("Splitting and scaling data")
         # splitting the data in training and testing set
         xtrain, xtest, ytrain, ytest = train_test_split(x, y, test_size=0.2, stratify=y, random_state=42)
         
@@ -70,7 +69,7 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         xtest_scaled = scale.transform(xtest)
         
         # 1. Logistic Regression Model
-        logging.info("Training Logistic Regression Model")
+        logger.info("Training Logistic Regression Model")
         lrmodel = LogisticRegression(C=lr_c, max_iter=200)
         lrmodel.fit(xtrain_scaled, ytrain)
         lr_ypred = lrmodel.predict(xtest_scaled)
@@ -79,7 +78,7 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         results['lr_report'] = classification_report(ytest, lr_ypred)
         
         # 2. Decision Tree Model
-        logging.info("Training Decision Tree Model")
+        logger.info("Training Decision Tree Model")
         dtmodel = DecisionTreeClassifier()
         dtmodel.fit(xtrain_scaled, ytrain)
         dt_ypred = dtmodel.predict(xtest_scaled)
@@ -88,7 +87,7 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         results['dt_report'] = classification_report(ytest, dt_ypred)
         
         # 3. Random Forest Model
-        logging.info("Training Random Forest Model")
+        logger.info("Training Random Forest Model")
         rfmodel = RandomForestClassifier(n_estimators=rf_n_estimators, max_depth=rf_max_depth, random_state=42)
         rfmodel.fit(xtrain_scaled, ytrain)
         rf_ypred = rfmodel.predict(xtest_scaled)
@@ -97,7 +96,7 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         results['rf_report'] = classification_report(ytest, rf_ypred)
         
         # KFold Cross Validation
-        logging.info("Performing K-Fold Cross Validation")
+        logger.info("Performing K-Fold Cross Validation")
         kfold = KFold(n_splits=5)
         lr_scores = cross_val_score(lrmodel, xtrain_scaled, ytrain, cv=kfold)
         rf_scores = cross_val_score(rfmodel, xtrain_scaled, ytrain, cv=kfold)
@@ -105,12 +104,13 @@ def run_loan_model(data_path='Datasets/credit.csv', lr_c=1.0, rf_n_estimators=10
         results['lr_kfold_mean'] = lr_scores.mean()
         results['rf_kfold_mean'] = rf_scores.mean()
         
-        logging.info("Pipeline executed successfully.")
+        logger.info(f"Loan pipeline done — LR acc: {results.get('logistic_regression_acc', 'N/A'):.2%}, RF acc: {results.get('random_forest_acc', 'N/A'):.2%}")
+        logger.info("Loan Eligibility Pipeline executed successfully.")
         return results
         
     except FileNotFoundError:
-        logging.error(f"Dataset not found at {data_path}. Please check the file path.")
+        logger.error(f"Dataset not found at {data_path}. Please check the file path.")
         raise
     except Exception as e:
-        logging.error(f"An error occurred during pipeline execution: {str(e)}")
+        logger.error(f"An error occurred during pipeline execution: {str(e)}", exc_info=True)
         raise
